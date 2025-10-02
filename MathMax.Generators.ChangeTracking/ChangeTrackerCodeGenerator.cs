@@ -299,25 +299,28 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
 
     private static void AppendScalarPropertyDiffs(StringBuilder sb, INamedTypeSymbol currentType)
     {
-        var scalarProps = currentType.GetMembers().OfType<IPropertySymbol>()
-            .Where(p => !p.IsIndexer && p.GetMethod is not null && p.Type.IsSimpleType());
-        foreach (var prop in scalarProps)
+        var scalarPropNames = currentType.GetMembers().OfType<IPropertySymbol>()
+            .Where(p => !p.IsIndexer && p.GetMethod is not null && p.Type.IsSimpleType())
+            .Select(prop => prop.Name);
+
+        foreach (var propName in scalarPropNames)
         {
-            sb.Append("        if (left.").Append(prop.Name).Append(" != right.").Append(prop.Name).AppendLine(")");
+            sb.Append("        if (left.").Append(propName).Append(" != right.").Append(propName).AppendLine(")");
             sb.Append("            yield return ChangeTrackerExtensions.CreatePropertyDifference(path, nameof(")
-                .Append(currentType.Name).Append('.').Append(prop.Name)
-                .Append("), left, right, left.").Append(prop.Name)
-                .Append(", right.").Append(prop.Name).AppendLine(");");
+                .Append(currentType.Name).Append('.').Append(propName)
+                .Append("), left, right, left.").Append(propName)
+                .Append(", right.").Append(propName).AppendLine(");");
         }
     }
 
     private static void AppendComplexPropertyDiffs(StringBuilder sb, INamedTypeSymbol currentType)
     {
-        var complexProps = currentType.GetMembers().OfType<IPropertySymbol>()
-            .Where(p => !p.IsIndexer && p.GetMethod is not null && p.Type.GetTypeCategory() == TypeCategory.Complex);
-        foreach (var prop in complexProps)
+        var complexPropNames = currentType.GetMembers().OfType<IPropertySymbol>()
+            .Where(p => !p.IsIndexer && p.GetMethod is not null && p.Type.GetTypeCategory() == TypeCategory.Complex)
+            .Select(prop => prop.Name);
+
+        foreach (var propName in complexPropNames)
         {
-            var propName = prop.Name;
             sb.AppendLine();
             sb.AppendLine($"        if (left.{propName} != null || right.{propName} != null)");
             sb.AppendLine("        {");
