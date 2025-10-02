@@ -268,47 +268,66 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
 
     private static void GenerateGetDifferencesMethod(StringBuilder sb, INamedTypeSymbol currentType, List<TrackInfo> allTracks, bool isRoot)
     {
+        AppendMethodHeader(sb, currentType, isRoot);
+        AppendNullChecks(sb);
+        AppendScalarPropertyDiffs(sb, currentType);
+        AppendComplexPropertyDiffs(sb, currentType);
+        AppendCollectionDiffs(sb, currentType, allTracks);
+        AppendMethodFooter(sb);
+    }
+
+    // --- Helper emission methods (pure string building, no semantic changes) ---
+    private static void AppendMethodHeader(StringBuilder sb, INamedTypeSymbol currentType, bool isRoot)
+    {
         var accessibility = isRoot ? "public" : "private";
-        sb.Append("    ").Append(accessibility).Append(" static IEnumerable<Difference> GetDifferences(this ")
+        sb.Append("    ").Append(accessibility).Append(" static IEnumerable<Difference> GetDifferences(")
+            .Append("this ")
             .Append(currentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
             .Append(" right, ")
             .Append(currentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
             .Append(" left, string path = nameof(")
             .Append(currentType.Name)
-            .AppendLine(")")
+            .AppendLine("))")
             .AppendLine("    {");
+    }
+
+    private static void AppendNullChecks(StringBuilder sb)
+    {
         sb.AppendLine("        if (left == null && right == null) yield break;");
         sb.AppendLine("        if (left == null || right == null) { yield return new Difference { Path = path, LeftOwner = left, RightOwner = right, LeftValue = left, RightValue = right }; yield break; }");
+    }
 
-        // Diff scalar properties
-        var properties = currentType.GetMembers().OfType<IPropertySymbol>()
-            .Where(p => !p.IsIndexer && p.GetMethod is not null);
-        foreach (var prop in properties)
+    private static void AppendScalarPropertyDiffs(StringBuilder sb, INamedTypeSymbol currentType)
+    {
+        var scalarProps = currentType.GetMembers().OfType<IPropertySymbol>()
+            .Where(p => !p.IsIndexer && p.GetMethod is not null && p.Type.IsSimpleType());
+        foreach (var prop in scalarProps)
         {
-            var type = prop.Type;
-            if (type.IsSimpleType())
-            {
-                sb.Append("        if (left.").Append(prop.Name).Append(" != right.").Append(prop.Name).AppendLine(")");
-                sb.Append("            yield return ChangeTrackerExtensions.CreatePropertyDifference(path, nameof(")
-                    .Append(currentType.Name).Append('.').Append(prop.Name)
-                    .Append("), left, right, left.").Append(prop.Name)
-                    .Append(", right.").Append(prop.Name).AppendLine(");");
-            }
+            sb.Append("        if (left.").Append(prop.Name).Append(" != right.").Append(prop.Name).AppendLine(")");
+            sb.Append("            yield return ChangeTrackerExtensions.CreatePropertyDifference(path, nameof(")
+                .Append(currentType.Name).Append('.').Append(prop.Name)
+                .Append("), left, right, left.").Append(prop.Name)
+                .Append(", right.").Append(prop.Name).AppendLine(");");
         }
+    }
 
-        // Complex (non-collection) properties (implicit recursion)
+    private static void AppendComplexPropertyDiffs(StringBuilder sb, INamedTypeSymbol currentType)
+    {
         var complexProps = currentType.GetMembers().OfType<IPropertySymbol>()
             .Where(p => !p.IsIndexer && p.GetMethod is not null && p.Type.GetTypeCategory() == TypeCategory.Complex);
-        foreach (var propName in complexProps.Select(p => p.Name))
+        foreach (var prop in complexProps)
         {
+            var propName = prop.Name;
             sb.AppendLine();
             sb.AppendLine($"        if (left.{propName} != null || right.{propName} != null)");
             sb.AppendLine("        {");
             sb.AppendLine($"            foreach (var diff in left.{propName}.GetDifferences(right.{propName}, path + \".{propName}\")) yield return diff;");
             sb.AppendLine("        }");
         }
+    }
 
-        // Collection tracks whose owner is currentType
+    private static void AppendCollectionDiffs(StringBuilder sb, INamedTypeSymbol currentType, List<TrackInfo> allTracks)
+    {
         var owningTracks = allTracks.Where(t => SymbolEqualityComparer.Default.Equals(t.OwnerType, currentType));
         foreach (var track in owningTracks)
         {
@@ -319,11 +338,14 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
             sb.AppendLine("        {");
             sb.Append("            var leftList = left.").Append(propName).AppendLine(" ?? System.Array.Empty<" + elementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">();");
             sb.Append("            var rightList = right.").Append(propName).AppendLine(" ?? System.Array.Empty<" + elementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">();");
-                                    sb.AppendLine($"            foreach (var diff in ChangeTrackerExtensions.DiffListByIdentity(leftList, rightList, path + \".{propName}\", (l, r, pth) => l.GetDifferences(r, pth), {track.KeySelectorExpression}))");
+            sb.AppendLine($"            foreach (var diff in ChangeTrackerExtensions.DiffListByIdentity(leftList, rightList, path + \".{propName}\", (l, r, pth) => l.GetDifferences(r, pth), {track.KeySelectorExpression}))");
             sb.AppendLine("            { yield return diff; }");
             sb.AppendLine("        }");
         }
+    }
 
+    private static void AppendMethodFooter(StringBuilder sb)
+    {
         sb.AppendLine("    }");
         sb.AppendLine();
     }
