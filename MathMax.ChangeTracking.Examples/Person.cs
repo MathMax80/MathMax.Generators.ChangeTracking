@@ -9,6 +9,6 @@ public class Person
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public DateTime DateOfBirth { get; set; }
-    public IReadOnlyList<Address> Addresses { get; set; } = [];
+    public Address? Addresses { get; set; } = new Address();
     public IReadOnlyList<Order> Orders { get; set; } = [];
 }

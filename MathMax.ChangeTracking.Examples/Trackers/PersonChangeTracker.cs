@@ -7,7 +7,6 @@ public static class PersonChangeTracker
         // Declare the map once. Static ctor ensures this appears in compilation for generator discovery.
         ChangeTracking.Map<Person>(p =>
         {
-            p.Addresses.TrackBy(a => new { a.ZipCode, a.HouseNumber });
             p.Orders.TrackBy(o => o.OrderId, o =>
             {
                 o.Items.TrackBy(i => i.ProductId);

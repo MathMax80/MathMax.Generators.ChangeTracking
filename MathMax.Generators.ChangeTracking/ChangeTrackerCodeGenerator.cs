@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -35,75 +36,124 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
                 return; // DSL not present
             }
 
-            var perRoot = new Dictionary<INamedTypeSymbol, List<TrackInfo>>(SymbolEqualityComparer.Default);
-            var rootNamespaces = new Dictionary<INamedTypeSymbol, string>(SymbolEqualityComparer.Default);
-
-            // Find Map<TRoot>(lambda)
-            foreach (var invocation in invocationNodes.Distinct())
-            {
-                var model = compilation.GetSemanticModel(invocation.SyntaxTree);
-                if (model.GetSymbolInfo(invocation).Symbol is not IMethodSymbol methodSymbol)
-                {
-                    continue;
-                }
-
-                var methodName = methodSymbol.Name;
-                if (methodName == "Map" && SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType, changeTrackingClass))
-                {
-                    if (methodSymbol.TypeArguments.Length != 1)
-                    {
-                        continue;
-                    }
-
-                    if (methodSymbol.TypeArguments[0] is not INamedTypeSymbol rootType)
-                    {
-                        continue;
-                    }
-
-                    // Namespace for generation: use the namespace where Map invocation appears.
-                    var ns = GetEnclosingNamespace(invocation);
-                    rootNamespaces[rootType] = ns;
-
-                    // Traverse body of lambda argument
-                    if (invocation.ArgumentList.Arguments.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    var firstArg = invocation.ArgumentList.Arguments[0].Expression;
-                    var lambda = firstArg as LambdaExpressionSyntax;
-                    if (lambda == null)
-                    {
-                        continue;
-                    }
-
-                    var body = lambda.Body switch
-                    {
-                        BlockSyntax b => (SyntaxNode)b,
-                        ExpressionSyntax e => e,
-                        _ => null
-                    };
-                    if (body == null)
-                    {
-                        continue;
-                    }
-
-                    CollectTrackByInvocations(compilation, rootType, body, perRoot);
-                }
-            }
-
-            foreach (var kvp in perRoot)
-            {
-                var entityType = kvp.Key;
-                var tracks = kvp.Value
-                    .GroupBy(t => (t.OwnerType, t.CollectionPropertyName))
-                    .Select(g => g.First())
-                    .ToList();
-                rootNamespaces.TryGetValue(entityType, out var ns);
-                var source = GenerateSource(entityType, tracks, ns);
-                spc.AddSource(entityType.Name + ".ChangeTracking.g.cs", source);
-            }
+            ProcessCompilation(spc, compilation, invocationNodes, changeTrackingClass);
         });
+    }
+
+    private static void ProcessCompilation(SourceProductionContext spc,
+        Compilation compilation,
+        ImmutableArray<InvocationExpressionSyntax> invocationNodes,
+        INamedTypeSymbol changeTrackingClass)
+    {
+        var perRoot = new Dictionary<INamedTypeSymbol, List<TrackInfo>>(SymbolEqualityComparer.Default);
+        var rootNamespaces = new Dictionary<INamedTypeSymbol, string>(SymbolEqualityComparer.Default);
+
+        foreach (var invocation in invocationNodes.Distinct())
+        {
+            ProcessInvocation(compilation, invocation, changeTrackingClass, perRoot, rootNamespaces);
+        }
+
+        EmitSources(spc, perRoot, rootNamespaces);
+    }
+
+    private static void ProcessInvocation(
+        Compilation compilation,
+        InvocationExpressionSyntax invocation,
+        INamedTypeSymbol changeTrackingClass,
+        Dictionary<INamedTypeSymbol, List<TrackInfo>> perRoot,
+        Dictionary<INamedTypeSymbol, string> rootNamespaces)
+    {
+        var model = compilation.GetSemanticModel(invocation.SyntaxTree);
+        
+        if (model.GetSymbolInfo(invocation).Symbol is not IMethodSymbol methodSymbol)
+        {
+            return;
+        }
+
+        if (!IsMapOnChangeTracking(methodSymbol, changeTrackingClass))
+        {
+            return;
+        }
+
+        if (!TryGetRootType(methodSymbol, out var rootType))
+        {
+            return;
+        }
+
+        rootNamespaces[rootType] = GetEnclosingNamespace(invocation);
+        if (!TryGetLambdaBody(invocation, out var body))
+        {
+            return;
+        }
+
+        CollectTrackByInvocations(compilation, rootType, body, perRoot);
+    }
+
+    private static bool IsMapOnChangeTracking(IMethodSymbol methodSymbol, INamedTypeSymbol changeTrackingClass)
+        => methodSymbol.Name == "Map" && SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType, changeTrackingClass);
+
+    private static bool TryGetRootType(IMethodSymbol methodSymbol, out INamedTypeSymbol rootType)
+    {
+        rootType = null!;
+        if (methodSymbol.TypeArguments.Length != 1)
+        {
+            return false;
+        }
+
+        if (methodSymbol.TypeArguments[0] is not INamedTypeSymbol rt)
+        {
+            return false;
+        }
+
+        rootType = rt;
+        return true;
+    }
+
+    private static bool TryGetLambdaBody(InvocationExpressionSyntax invocation, out SyntaxNode body)
+    {
+        body = null!;
+        var argList = invocation.ArgumentList;
+        if (argList == null || argList.Arguments.Count == 0)
+        {
+            return false;
+        }
+
+        var firstArgExpr = argList.Arguments[0].Expression;
+        if (firstArgExpr is not LambdaExpressionSyntax lambda)
+        {
+            return false;
+        }
+
+        var resolvedBody = lambda.Body switch
+        {
+            BlockSyntax b => (SyntaxNode)b,
+            ExpressionSyntax e => e,
+            _ => null
+        };
+        if (resolvedBody == null)
+        {
+            return false;
+        }
+
+        body = resolvedBody;
+        return true;
+    }
+
+    private static void EmitSources(SourceProductionContext spc,
+        Dictionary<INamedTypeSymbol, List<TrackInfo>> perRoot,
+        Dictionary<INamedTypeSymbol, string> rootNamespaces)
+    {
+        foreach (var kvp in perRoot)
+        {
+            var entityType = kvp.Key;
+            var tracks = kvp.Value
+                .GroupBy(t => (t.OwnerType, t.CollectionPropertyName))
+                .Select(g => g.First())
+                .ToList();
+            rootNamespaces.TryGetValue(entityType, out var ns);
+            var source = GenerateSource(entityType, tracks, ns);
+            spc.AddSource(entityType.Name + ".ChangeTracking.g.cs", source);
+        }
     }
 
     private sealed class TrackInfo
@@ -283,9 +333,9 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
         sb.Append("    ").Append(accessibility).Append(" static IEnumerable<Difference> GetDifferences(")
             .Append("this ")
             .Append(currentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-            .Append(" right, ")
+            .Append(" left, ")
             .Append(currentType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
-            .Append(" left, string path = nameof(")
+            .Append(" right, string path = nameof(")
             .Append(currentType.Name)
             .AppendLine("))")
             .AppendLine("    {");
@@ -293,8 +343,8 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
 
     private static void AppendNullChecks(StringBuilder sb)
     {
-        sb.AppendLine("        if (left == null && right == null) yield break;");
-        sb.AppendLine("        if (left == null || right == null) { yield return new Difference { Path = path, LeftOwner = left, RightOwner = right, LeftValue = left, RightValue = right }; yield break; }");
+    sb.AppendLine("        if (left == null && right == null) yield break;");
+    sb.AppendLine("        if (left == null || right == null) { yield return new Difference { Path = path, Kind = DifferenceKind.Presence, LeftOwner = null, RightOwner = null, LeftValue = left, RightValue = right }; yield break; }");
     }
 
     private static void AppendScalarPropertyDiffs(StringBuilder sb, INamedTypeSymbol currentType)
@@ -324,7 +374,14 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
             sb.AppendLine();
             sb.AppendLine($"        if (left.{propName} != null || right.{propName} != null)");
             sb.AppendLine("        {");
-            sb.AppendLine($"            foreach (var diff in left.{propName}.GetDifferences(right.{propName}, path + \".{propName}\")) yield return diff;");
+            sb.AppendLine($"            if (left.{propName} == null || right.{propName} == null)");
+            sb.AppendLine("            {");
+            sb.AppendLine($"                yield return new Difference {{ Path = path + \".{propName}\", Kind = DifferenceKind.Presence, LeftOwner = left, RightOwner = right, LeftValue = left.{propName}, RightValue = right.{propName} }};");
+            sb.AppendLine("            }");
+            sb.AppendLine("            else");
+            sb.AppendLine("            {");
+            sb.AppendLine($"                foreach (var diff in left.{propName}.GetDifferences(right.{propName}, path + \".{propName}\")) yield return diff;");
+            sb.AppendLine("            }");
             sb.AppendLine("        }");
         }
     }
@@ -341,7 +398,7 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
             sb.AppendLine("        {");
             sb.Append("            var leftList = left.").Append(propName).AppendLine(" ?? System.Array.Empty<" + elementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">();");
             sb.Append("            var rightList = right.").Append(propName).AppendLine(" ?? System.Array.Empty<" + elementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ">();");
-            sb.AppendLine($"            foreach (var diff in ChangeTrackerExtensions.DiffListByIdentity(leftList, rightList, path + \".{propName}\", (l, r, pth) => l.GetDifferences(r, pth), {track.KeySelectorExpression}))");
+            sb.AppendLine($"            foreach (var diff in ChangeTrackerExtensions.DiffListByIdentity(leftList, rightList, path + \".{propName}\", (lItem, rItem, pth) => lItem.GetDifferences(rItem, pth), {track.KeySelectorExpression}, left))");
             sb.AppendLine("            { yield return diff; }");
             sb.AppendLine("        }");
         }
@@ -357,6 +414,8 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
     {
         var set = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default) { root };
         var queue = new Queue<INamedTypeSymbol>();
+        // Ensure the root is processed so its complex (non-tracked) property graph is explored.
+        queue.Enqueue(root);
         void Enqueue(INamedTypeSymbol t)
         {
             if (set.Add(t))

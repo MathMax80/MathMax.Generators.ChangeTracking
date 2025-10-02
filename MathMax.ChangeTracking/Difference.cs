@@ -3,11 +3,25 @@ using System.Text.Json.Serialization;
 namespace MathMax.ChangeTracking;
 
 /// <summary>
+/// Kind/classification of a produced difference entry.
+/// </summary>
+public enum DifferenceKind
+{
+    /// <summary>A change in the value of a (simple) property.</summary>
+    PropertyValue = 0,
+    /// <summary>Presence / identity difference (added / removed object, collection element, or complex child).</summary>
+    Presence = 1
+}
+
+/// <summary>
 /// Represents a single difference between two object graphs compared by the generated Diff extensions.
 /// </summary>
 public sealed class Difference
 {
     public string Path { get; set; } = string.Empty;
+
+    /// <summary>Classification of the difference.</summary>
+    public DifferenceKind Kind { get; set; }
 
     /// <summary>
     /// The object instance (left side) that owns the changed property indicated by <see cref="Path"/>.
@@ -29,5 +43,5 @@ public sealed class Difference
 
     public object? RightValue { get; set; }
 
-    public override string ToString() => $"{Path}: {LeftValue} -> {RightValue}";
+    public override string ToString() => $"[{Kind}] {Path}: {LeftValue} -> {RightValue}";
 }

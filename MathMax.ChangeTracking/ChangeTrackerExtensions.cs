@@ -19,6 +19,7 @@ public static class ChangeTrackerExtensions
     public static Difference CreatePropertyDifference(string path, string propertyName, object? leftOwner, object? rightOwner, object? leftValue, object? rightValue) => new()
     {
         Path = $"{path}.{propertyName}",
+        Kind = DifferenceKind.PropertyValue,
         LeftOwner = leftOwner,
         RightOwner = rightOwner,
         LeftValue = leftValue,
@@ -32,13 +33,14 @@ public static class ChangeTrackerExtensions
     /// <param name="left">The item on the left side.</param>
     /// <param name="right">The item on the right side.</param>
     /// <returns>A presence difference record.</returns>
-    public static Difference CreatePresenceDifference(string path, object? left, object? right) => new()
+    public static Difference CreatePresenceDifference(string path, object? parentOwner, object? leftValue, object? rightValue) => new()
     {
         Path = path,
-        LeftOwner = left,
-        RightOwner = right,
-        LeftValue = left,
-        RightValue = right
+        Kind = DifferenceKind.Presence,
+        LeftOwner = parentOwner,
+        RightOwner = parentOwner,
+        LeftValue = leftValue,
+        RightValue = rightValue
     };
 
     /// <summary>
@@ -56,7 +58,8 @@ public static class ChangeTrackerExtensions
     /// <returns>A sequence of differences between the two lists.</returns>
     public static IEnumerable<Difference> DiffListByIdentity<T, TKey>(IEnumerable<T> leftList, IEnumerable<T> rightList, string path,
         Func<T, T, string, IEnumerable<Difference>> perItemDiff,
-        Func<T, TKey> keySelector)
+        Func<T, TKey> keySelector,
+        object? parentOwner = null)
             where TKey : notnull
             where T : class
     {
@@ -72,7 +75,8 @@ public static class ChangeTrackerExtensions
 
             if (left == null || right == null || !inLeft || !inRight)
             {
-                yield return CreatePresenceDifference(itemPath, left, right);
+                // Parent owner is the collection (passed via parentOwner); if unknown, fall back to null.
+                yield return CreatePresenceDifference(itemPath, parentOwner, left, right);
                 continue;
             }
 
