@@ -3,11 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.Generators.ChangeTracking", "MathMax.Generators.ChangeTracking\MathMax.Generators.ChangeTracking.csproj", "{1FE22F30-EDE6-430A-98AB-12CFF0A20620}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.Generators.ChangeTracking", "src\MathMax.Generators.ChangeTracking\MathMax.Generators.ChangeTracking.csproj", "{1FE22F30-EDE6-430A-98AB-12CFF0A20620}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.ChangeTracking", "MathMax.ChangeTracking\MathMax.ChangeTracking.csproj", "{CF1C5956-7EAC-4943-8154-A532A6519470}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.ChangeTracking", "src\MathMax.ChangeTracking\MathMax.ChangeTracking.csproj", "{CF1C5956-7EAC-4943-8154-A532A6519470}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.ChangeTracking.Examples", "MathMax.ChangeTracking.Examples\MathMax.ChangeTracking.Examples.csproj", "{D97EE22D-35DD-4539-8C17-5591DC324FFA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.ChangeTracking.Examples", "src\MathMax.ChangeTracking.Examples\MathMax.ChangeTracking.Examples.csproj", "{D97EE22D-35DD-4539-8C17-5591DC324FFA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MathMax.ChangeTracking.Examples.Tests", "tests\MathMax.ChangeTracking.Examples.Tests\MathMax.ChangeTracking.Examples.Tests.csproj", "{AF3333FB-2C7F-492C-BDAB-3A5159981804}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -55,8 +59,23 @@ Global
 		{D97EE22D-35DD-4539-8C17-5591DC324FFA}.Release|x64.Build.0 = Release|Any CPU
 		{D97EE22D-35DD-4539-8C17-5591DC324FFA}.Release|x86.ActiveCfg = Release|Any CPU
 		{D97EE22D-35DD-4539-8C17-5591DC324FFA}.Release|x86.Build.0 = Release|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Debug|x64.Build.0 = Debug|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Debug|x86.Build.0 = Debug|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Release|x64.ActiveCfg = Release|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Release|x64.Build.0 = Release|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Release|x86.ActiveCfg = Release|Any CPU
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{AF3333FB-2C7F-492C-BDAB-3A5159981804} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
