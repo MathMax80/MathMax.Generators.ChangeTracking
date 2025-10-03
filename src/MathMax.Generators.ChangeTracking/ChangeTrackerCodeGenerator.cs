@@ -9,6 +9,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace MathMax.Generators.ChangeTracking;
 
+#pragma warning disable S1192 // Enable analyzer release tracking
+
 [Generator]
 public class ChangeTrackerCodeGenerator : IIncrementalGenerator
 {
@@ -227,11 +229,11 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
             return named.TypeArguments[0];
         }
         // Try any implemented IEnumerable<T>
-        foreach (var iface in collectionType.AllInterfaces)
+        foreach (var interfaceSymbol in collectionType.AllInterfaces)
         {
-            if (iface.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T && iface.TypeArguments.Length == 1)
+            if (interfaceSymbol.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T && interfaceSymbol.TypeArguments.Length == 1)
             {
-                return iface.TypeArguments[0];
+                return interfaceSymbol.TypeArguments[0];
             }
         }
         return null;
@@ -447,3 +449,5 @@ public class ChangeTrackerCodeGenerator : IIncrementalGenerator
         return string.Empty;
     }
 }
+
+#pragma warning restore S1192 // Enable analyzer release tracking
