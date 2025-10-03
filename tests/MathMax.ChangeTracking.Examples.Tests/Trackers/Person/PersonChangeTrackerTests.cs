@@ -155,7 +155,7 @@ public class PersonChangeTrackerTests
 
         // Assert
         differences.ShouldBeEmpty();
-    }    
+    }
 
     [Fact]
     public void Collection_ItemScalarPropertyChanged_YieldsNestedDifference()
@@ -256,12 +256,12 @@ public class PersonChangeTrackerTests
         difference.RightValue.ShouldBe(right);
     }
 
-   [Fact]
+    [Fact]
     public void RootObjectRemoved_YieldsPresenceDifference()
     {
         // Arrange
         Person left = Fixture.CreatePerson(Guid.NewGuid());
-        Person? right = null; 
+        Person? right = null;
 
         // Act
         var differences = left.GetDifferences(right!).ToArray();
