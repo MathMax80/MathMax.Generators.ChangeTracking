@@ -10,6 +10,7 @@
     <AssemblyName>MathMax.Generators.ChangeTracking</AssemblyName>
     <RootNamespace>MathMax.Generators.ChangeTracking</RootNamespace>
     <WarningsAsErrors>true</WarningsAsErrors>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
