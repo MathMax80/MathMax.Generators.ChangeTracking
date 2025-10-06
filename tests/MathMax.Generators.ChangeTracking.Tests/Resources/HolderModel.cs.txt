@@ -1,0 +1,31 @@
+#nullable enable
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+
+public enum MyEnum { A, B }
+public struct MyCustomStruct { public int A; }
+public class CustomClass { public int B { get; set; } }
+public class IterableCustom : IEnumerable<int>
+{
+    public IEnumerator<int> GetEnumerator() => (new List<int>()).GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+public class Holder {
+    public string? NullableStringField = null;
+    public int? NullableIntField = null;
+    public string NonNullableStringField = string.Empty;
+    public int NonNullableIntField = 0;
+    public int[] IntArrayField = System.Array.Empty<int>();
+    public List<int> IntListField = new();
+    public IEnumerable<int> IntEnumerableField = System.Linq.Enumerable.Empty<int>();
+    public Dictionary<string,int> DictField = new();
+    public IterableCustom IterableCustomField = new();
+    public CustomClass CustomClassField = new();
+    public MyCustomStruct CustomStructField = new();
+    public Guid GuidField = Guid.Empty;
+    public DateTimeOffset DateTimeOffsetField = default;
+    public TimeSpan TimeSpanField = default;
+    public MyEnum EnumField = MyEnum.A;
+}
