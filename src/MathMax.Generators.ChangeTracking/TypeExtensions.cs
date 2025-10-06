@@ -112,6 +112,13 @@ public static class TypeExtensions
             return false;
         }
 
+        // Treat System.String specially: although it implements IEnumerable<char>, we consider it a simple scalar value
+        // for change tracking purposes, not a collection to traverse.
+        if (type.SpecialType == SpecialType.System_String)
+        {
+            return false;
+        }
+
         if (type.TypeKind == TypeKind.Array)
         {
             return true;
