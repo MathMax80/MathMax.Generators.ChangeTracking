@@ -16,4 +16,3 @@ public class TrackGenerationModel
         RootNamespaces = rootNamespaces;
     }
 }
-#pragma warning restore S1192 // Enable analyzer release tracking
