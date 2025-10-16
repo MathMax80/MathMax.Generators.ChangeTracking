@@ -1,0 +1,70 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'   # e.g. v1.2.0 or v1.2.0-beta
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      NUGET_SOURCE: https://api.nuget.org/v3/index.json
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5.0.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5.0.0
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      # ✅ Validate version (SemVer)
+      - name: Validate semantic version
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "❌ Invalid version format: $version"
+            exit 1
+          fi
+          echo "✅ Version $version is valid."
+
+      # 1️⃣ Build & publish runtime package
+      - name: Pack and publish MathMax.ChangeTracking
+        run: |
+          dotnet pack src/MathMax.ChangeTracking \
+            -c Release \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -o out
+          dotnet nuget push "out/MathMax.ChangeTracking.${{ steps.version.outputs.version }}.nupkg" \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source $NUGET_SOURCE
+
+      # 2️⃣ Build & publish generator (uses $(CI)=true + $(Version))
+      - name: Pack and publish MathMax.Generators.ChangeTracking
+        env:
+          CI: "true"
+          Version: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet restore
+          dotnet pack src/MathMax.Generators.ChangeTracking \
+            -c Release \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -o out
+          dotnet nuget push "out/MathMax.Generators.ChangeTracking.${{ steps.version.outputs.version }}.nupkg" \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source $NUGET_SOURCE
+
+      # 3️⃣ Create GitHub Release entry
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2.4.1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ steps.version.outputs.version }}"
+          body: "Automated release for version ${{ steps.version.outputs.version }}"
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}

@@ -98,6 +98,29 @@ public class PersonChangeTrackerTests
     }
 
     [Fact]
+    public void ComplexProperty_ScalarPropertyChanged_YieldsNestedDifference()
+    {
+        // Arrange
+        var (left, right) = Fixture.CreateEqualPersonPair();
+        right.Address!.City = "NewCity"; // change scalar property of complex property
+
+        // Act
+        var differences = left.GetDifferences(right).ToArray();
+
+        // Assert
+        var difference = differences.ShouldHaveSingleItem();
+        Console.WriteLine(difference);
+
+        difference.ShouldNotBeNull();
+        difference.Path.ShouldBe("Person.Address.City");
+        difference.Kind.ShouldBe(DifferenceKind.Modification);
+        difference.LeftOwner.ShouldBe(left.Address);
+        difference.LeftValue.ShouldBe(left.Address!.City);
+        difference.RightOwner.ShouldBe(right.Address);
+        difference.RightValue.ShouldBe(right.Address!.City);
+    }
+
+    [Fact]
     public void Collection_ItemAdded_YieldsPresenceDifference()
     {
         // Arrange
@@ -171,7 +194,6 @@ public class PersonChangeTrackerTests
 
         // Assert
         var difference = differences.ShouldHaveSingleItem();
-        Console.WriteLine(difference);
         difference.ShouldNotBeNull();
         difference.Path.ShouldBe($"Person.Orders[(OrderId={leftOrder.OrderId})].OrderDate");
         difference.Kind.ShouldBe(DifferenceKind.Modification);
