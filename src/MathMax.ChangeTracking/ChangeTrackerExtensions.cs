@@ -200,6 +200,6 @@ public static class ChangeTrackerExtensions
             return $"'{value}'";
         }
 
-        return Convert.ToString(value) ?? string.Empty;
+        return value.ToString();
     }
 }
