@@ -57,18 +57,4 @@
       Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
   </ItemGroup>
 
-  <!-- ✅ Local dev: use project reference -->
-  <ItemGroup Condition="'$(CI)' != 'true'">
-    <ProjectReference Include="..\MathMax.ChangeTracking\MathMax.ChangeTracking.csproj">
-      <PrivateAssets>all</PrivateAssets>
-    </ProjectReference>
-  </ItemGroup>
-
-  <!-- ✅ CI release build: use NuGet package reference -->
-  <ItemGroup Condition="'$(CI)' == 'true'">
-    <PackageReference Include="MathMax.ChangeTracking"
-      Version="$(Version)"
-      PrivateAssets="all" />
-  </ItemGroup>
-
 </Project>

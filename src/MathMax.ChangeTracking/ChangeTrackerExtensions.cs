@@ -154,52 +154,76 @@ public static class ChangeTrackerExtensions
     /// Formats a key value for display in a path segment. 
     /// Handles single-value keys and anonymous composite keys. 
     /// </summary>
-    /// <typeparam name="TKey"></typeparam>
-    /// <param name="key"></param>
-    /// <param name="memberNames"></param>
-    /// <returns></returns>
+    /// <typeparam name="TKey">The type of the key to format.</typeparam>
+    /// <param name="key">The key value to format.</param>
+    /// <param name="memberNames">The names of the key members for composite keys.</param>
+    /// <returns>A formatted string representation of the key suitable for path segments.</returns>
     private static string FormatKey<TKey>(TKey key, string[] memberNames)
         where TKey : notnull
     {
-        // If we have member names (simple or anonymous composite key), format as (Name=Value,Name2=Value2)
-        if (memberNames.Length == 0)
+        return memberNames.Length switch
         {
-            // Fallback: single value with unknown member name
-            return "(" + key.ToString() + ")";
-        }
+            0 => FormatSimpleKey(key),
+            1 => FormatSingleMemberKey(key, memberNames[0]),
+            _ => FormatCompositeMemberKey(key, memberNames)
+        };
+    }
 
-        if (memberNames.Length == 1)
-        {
-            var value = key.ToString();
-            value = QuoteIfNeeded(value, key.GetType());
-            return "(" + memberNames[0] + "=" + value + ")";
-        }
+    private static string FormatSimpleKey<TKey>(TKey key) where TKey : notnull
+    {
+        var keyString = key.ToString() ?? key.GetType().Name;
+        return $"({keyString})";
+    }
 
-        // Composite (anonymous) key: reflect properties in order
-        var type = key.GetType();
-        var parts = new List<string>(memberNames.Length);
-        foreach (var name in memberNames)
+    private static string FormatSingleMemberKey<TKey>(TKey key, string memberName) where TKey : notnull
+    {
+        var keyString = key.ToString() ?? key.GetType().Name;
+        var quotedValue = QuoteIfNeeded(keyString, key.GetType());
+        return $"({memberName}={quotedValue})";
+    }
+
+    private static string FormatCompositeMemberKey<TKey>(TKey key, string[] memberNames) where TKey : notnull
+    {
+        var keyType = key.GetType();
+        var formattedPairs = new string[memberNames.Length];
+        
+        for (int i = 0; i < memberNames.Length; i++)
         {
-            var property = type.GetProperty(name);
-            var value = property?.GetValue(key);
-            var quotedValue = QuoteIfNeeded(value, property?.PropertyType);
-            parts.Add(name + "=" + quotedValue);
+            var memberName = memberNames[i];
+            var property = keyType.GetProperty(memberName);
+            
+            if (property == null)
+            {
+                throw new ChangeTrackingGenerationException($"Property '{memberName}' not found on type '{keyType.Name}'.");
+            }
+
+            var propertyValue = property.GetValue(key);
+            var quotedValue = QuoteIfNeeded(propertyValue, property.PropertyType);
+            formattedPairs[i] = $"{memberName}={quotedValue}";
         }
-        return "(" + string.Join(",", parts) + ")";
+        
+        return $"({string.Join(",", formattedPairs)})";
     }
 
     private static string QuoteIfNeeded<T>(T? value, Type? type)
     {
         if (value is null)
         {
-            return string.Empty;
+            return "";
         }
 
-        if (type == typeof(string) || type == typeof(char))
+        // Quote string and char types for clarity in output
+        if (type == typeof(string))
+        {
+            return $"'{value}'";
+        }
+        
+        if (type == typeof(char))
         {
             return $"'{value}'";
         }
 
-        return value.ToString() ?? value.GetType().ToString() ?? string.Empty;
+        // For other types, use their string representation
+        return value.ToString() ?? value.GetType().Name;
     }
 }
