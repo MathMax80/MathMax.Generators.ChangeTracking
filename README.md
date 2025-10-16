@@ -4,12 +4,6 @@ Lightweight C# source generator that produces efficient, allocation‑friendly d
 
 > Zero reflection at runtime. No expression tree compilation. Pure compile‑time generation + straightforward POCO iteration.
 
-## Why?
-Typical change tracking for nested aggregates (Orders → Items, Person → Addresses, etc.) either:
-* Re‑implements ad‑hoc recursive comparison logic per model.
-* Uses heavy reflection / JSON diff libs with extra boxing & allocations.
-* Fails to treat collections by identity (so reorder = massive diff noise).
-
 This project gives you:
 * **Deterministic paths** (`Person.Addresses[12345].Street`) enabling filtering / dispatch.
 * **Identity-aware collection diffing** via `TrackBy(x => x.Key)` – stable regardless of ordering.
@@ -17,18 +11,23 @@ This project gives you:
 * **Composable post-processing** (regex‑based `IDifferenceHandler` & dispatcher included).
 * **Simple primitives detection** (no accidental deep walk of value objects like `Guid`).
 
-## Packages / Projects
-| Project | Purpose | Target |
-|--------|---------|--------|
-| `MathMax.Generators.ChangeTracking` | Source generator (adds `*.ChangeTracking.g.cs`) | netstandard2.0 (Roslyn) |
-| `MathMax.ChangeTracking` | Runtime helper types (`Difference`, dispatcher, DSL markers) | net9.0 |
-| `MathMax.ChangeTracking.Examples` | Example POCOs + hand-crafted sample | net9.0 |
-
-> NuGet packaging instructions TBD (add badges once published).
-
 ## Quick Start
-1. Reference the generator + runtime library projects (or future NuGet packages) from your domain project.
-2. In any `.cs` file, declare a mapping describing which collections are keyed:
+
+### Install via NuGet
+
+```bash
+dotnet add package MathMax.Generators.ChangeTracking
+```
+
+> **Important**: You must also manually add the runtime package:
+> ```bash
+> dotnet add package MathMax.ChangeTracking
+> ```
+> The generator package does not automatically include the runtime package due to source generator packaging constraints.
+
+### Basic Usage
+
+1. In any `.cs` file, declare a mapping describing which collections are keyed:
 
 ```csharp
 using MathMax.ChangeTracking;
@@ -51,14 +50,40 @@ public static class ChangeTrackingConfig
 }
 ```
 
-3. Build the solution. A generated file (e.g. `Person.ChangeTracking.g.cs`) appears in Analyzers → Generated Files.
-4. Use the generated extension to diff two graphs:
+2. Build the solution. A generated file (e.g. `Person.ChangeTracking.g.cs`) appears in Analyzers → Generated Files.
+3. Use the generated extension to diff two graphs:
 
 ```csharp
 IEnumerable<Difference> diffs = modifiedPerson.GetDifferences(originalPerson);
 foreach (var d in diffs)
 	Console.WriteLine(d); // Person.FirstName: John -> Jonathan
 ```
+
+## Minimal Example
+
+```csharp
+var original = new Person { FirstName = "John", LastName = "Smith", PersonId = Guid.NewGuid() };
+var modified = new Person { FirstName = "Jonathan", LastName = "Smith", PersonId = original.PersonId };
+
+ChangeTracking.Map<Person>(p => { /* even empty map will still compare scalars */ });
+var diffs = modified.GetDifferences(original); // generated after build
+// Yields: Person.FirstName difference
+```
+
+## Why?
+
+Typical change tracking for nested aggregates (Orders → Items, Person → Addresses, etc.) either:
+* Re‑implements ad‑hoc recursive comparison logic per model.
+* Uses heavy reflection / JSON diff libs with extra boxing & allocations.
+* Fails to treat collections by identity (so reorder = massive diff noise).
+
+## What?
+
+| Project | Purpose | Target |
+|--------|---------|--------|
+| `MathMax.Generators.ChangeTracking` | Source generator (adds `*.ChangeTracking.g.cs`) | netstandard2.0 (Roslyn) |
+| `MathMax.ChangeTracking` | Runtime helper types (`Difference`, dispatcher, DSL markers) | net9.0 |
+| `MathMax.ChangeTracking.Examples` | Example POCOs + hand-crafted sample | net9.0 |
 
 ## DSL Explained
 `ChangeTracking.Map<TRoot>(lambda)` is a **compile‑time marker**. The lambda executes at runtime with `default!` so avoid dereferencing – only call `TrackBy` on collection navigation properties.
@@ -132,23 +157,11 @@ Console.WriteLine($"Handled: {result.Handled.Length}, Unhandled: {result.Unhandl
 * [ ] Benchmarks project (BenchmarkDotNet) documenting throughput & allocation vs reflection libs.
 
 ## Contributing
-PRs and issues welcome. Please:
-1. Describe the scenario / failing case clearly.
-2. Add or update unit tests (tests project TBD).
-3. Keep generator output deterministic (avoid DateTime.Now, GUIDs, etc.).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines including development setup, pull request process, and coding standards.
 
 ## License
 MIT (see `LICENSE`).
-
-## Minimal Example (Inline)
-```csharp
-var original = new Person { FirstName = "John", LastName = "Smith", PersonId = Guid.NewGuid() };
-var modified = new Person { FirstName = "Jonathan", LastName = "Smith", PersonId = original.PersonId };
-
-ChangeTracking.Map<Person>(p => { /* even empty map will still compare scalars */ });
-var diffs = modified.GetDifferences(original); // generated after build
-// Yields: Person.FirstName difference
-```
 
 ---
 Feel free to open an issue if a desired scenario (e.g., dictionaries, value object custom equality, ignoring properties) is missing.
