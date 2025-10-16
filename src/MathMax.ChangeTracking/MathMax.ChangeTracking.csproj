@@ -12,19 +12,23 @@
     <PackageId>MathMax.ChangeTracking</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Authors>MathMax80</Authors>
-    <Description>Lightweight C# source generator that produces efficient, allocation‑friendly
-      diffing code for your aggregate / entity graphs.</Description>
+    <Description>This package provides the core types, fluent DSL, and difference handling
+      infrastructure used by the
+      [MathMax.Generators.ChangeTracking](https://github.com/MathMax80/MathMax.Generators.ChangeTracking)
+      source generator. While designed to work together, this runtime library can be used
+      independently for scenarios where you want to manually implement diffing logic or integrate
+      with other code generation approaches.</Description>
     <PackageProjectUrl>https://github.com/MathMax80/MathMax.ChangeTracking</PackageProjectUrl>
     <RepositoryUrl>https://github.com/MathMax80/MathMax.ChangeTracking</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageTags>source-generator; source-generators; code-generator; code-generators;
-      change-tracking; diffing; dotnet; csharp</PackageTags>    
+      change-tracking; diffing; dotnet; csharp</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include=".\README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>  
+  </ItemGroup>
 
 </Project>
