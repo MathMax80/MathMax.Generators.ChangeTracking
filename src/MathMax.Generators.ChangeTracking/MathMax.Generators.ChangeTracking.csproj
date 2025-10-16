@@ -11,7 +11,31 @@
     <RootNamespace>MathMax.Generators.ChangeTracking</RootNamespace>
     <WarningsAsErrors>true</WarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>MathMax.Generators.ChangeTracking</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Authors>MathMax80</Authors>
+    <Description>Lightweight C# source generator that produces efficient, allocation‑friendly
+      diffing code for your aggregate / entity graphs.</Description>
+    <PackageProjectUrl>https://github.com/MathMax80/MathMax.Generators.ChangeTracking</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MathMax80/MathMax.Generators.ChangeTracking</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageTags>source-generator; source-generators; code-generator; code-generators;
+      change-tracking; diffing; dotnet; csharp</PackageTags>
+
+    <!-- Development Dependency - This analyzer should not be included in consuming projects as a
+    runtime dependency -->
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0">
@@ -19,6 +43,32 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+  </ItemGroup>
+
+  <!-- Analyzer DLL packaging -->
+
+  <!-- Include the analyzer DLL in the NuGet package -->
+  <ItemGroup>
+    <!-- This ensures the analyzer DLL is included in the correct location for Roslyn analyzers -->
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true"
+      PackagePath="analyzers\dotnet\cs\$(AssemblyName).dll" Visible="false" />
+    <None Include="$(OutputPath)$(AssemblyName).pdb" Pack="true"
+      PackagePath="analyzers\dotnet\cs\$(AssemblyName).pdb" Visible="false"
+      Condition="Exists('$(OutputPath)$(AssemblyName).pdb')" />
+  </ItemGroup>
+
+  <!-- ✅ Local dev: use project reference -->
+  <ItemGroup Condition="'$(CI)' != 'true'">
+    <ProjectReference Include="..\MathMax.ChangeTracking\MathMax.ChangeTracking.csproj">
+      <PrivateAssets>all</PrivateAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- ✅ CI release build: use NuGet package reference -->
+  <ItemGroup Condition="'$(CI)' == 'true'">
+    <PackageReference Include="MathMax.ChangeTracking"
+      Version="$(Version)"
+      PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

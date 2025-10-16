@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 
 namespace MathMax.ChangeTracking;
 
-public static partial class ChangeTrackerExtensions
+public static class ChangeTrackerExtensions
 {
     /// <summary>
     /// Creates a property difference record. Indicates a change in value of a property.
@@ -73,23 +73,10 @@ public static partial class ChangeTrackerExtensions
         var keySelector = keySelectorExpr.Compile();
         var leftMap = leftList.ToDictionary(keySelector, v => v);
         var rightMap = rightList.ToDictionary(keySelector, v => v);
-        var orderedKeys = GetOrderedKeys(leftList, rightList, keySelector);
+        var uniqueKeys = GetUniqueKeys(leftList, rightList, keySelector);
+        string[] memberNames = GetKeyMembers(keySelectorExpr);
 
-        // Pre-compute key member metadata for formatting
-        List<string> memberNames = new();
-        if (keySelectorExpr.Body is MemberExpression member)
-        {
-            memberNames.Add(member.Member.Name);
-        }
-        else if (keySelectorExpr.Body is NewExpression anon && anon.Members != null)
-        {
-            foreach (var m in anon.Members)
-            {
-                memberNames.Add(m.Name);
-            }
-        }
-
-        foreach (var key in orderedKeys)
+        foreach (var key in uniqueKeys)
         {
             string keyString = FormatKey(key, memberNames);
             var itemPath = path + "[" + keyString + "]";
@@ -100,8 +87,16 @@ public static partial class ChangeTrackerExtensions
             {
                 // Owners are the parent collections (leftList/rightList) – callers supply those.
                 var kind = DifferenceKind.Modification;
-                if (left == null && right != null) kind = DifferenceKind.Addition;
-                else if (right == null && left != null) kind = DifferenceKind.Removal;
+
+                if (left == null && right != null)
+                {
+                    kind = DifferenceKind.Addition;
+                }
+                else if (right == null && left != null)
+                {
+                    kind = DifferenceKind.Removal;
+                }
+
                 var diff = new Difference
                 {
                     Path = itemPath,
@@ -115,59 +110,96 @@ public static partial class ChangeTrackerExtensions
                 continue;
             }
 
-            foreach (var d in perItemDiff(left, right, itemPath))
+            foreach (var difference in perItemDiff(left, right, itemPath))
             {
-                yield return d;
+                yield return difference;
             }
         }
     }
 
-    private static IEnumerable<TKey> GetOrderedKeys<T, TKey>(IEnumerable<T> leftList, IEnumerable<T> rightList, Func<T, TKey> keySelector) where TKey : notnull
+    private static string[] GetKeyMembers<T, TKey>(Expression<Func<T, TKey>> keySelectorExpr)
+        where T : class
+        where TKey : notnull
     {
-        var seen = new HashSet<TKey>();
-        foreach (var k in leftList.Select(keySelector).Where(k => seen.Add(k))) yield return k;
-        foreach (var k in rightList.Select(keySelector).Where(k => seen.Add(k))) yield return k;
-    }
-}
 
-public static partial class ChangeTrackerExtensions
-{
-    private static string FormatKey<TKey>(TKey key, List<string> memberNames) where TKey : notnull
+        // Pre-compute key member metadata for formatting
+        if (keySelectorExpr.Body is MemberExpression member)
+        {
+            return [member.Member.Name];
+        }
+
+        if (keySelectorExpr.Body is NewExpression newExpression && newExpression.Members != null)
+        {
+            return [.. newExpression.Members.Select(m => m.Name)];
+        }
+
+        throw new ChangeTrackingGenerationException("Unsupported key selector expression. Must be a member access or anonymous object creation.");
+    }
+
+    private static IEnumerable<TKey> GetUniqueKeys<T, TKey>(IEnumerable<T> leftList, IEnumerable<T> rightList, Func<T, TKey> keySelector) where TKey : notnull
+    {
+        var uniqueKeys = new HashSet<TKey>();
+        foreach (var key in leftList.Select(keySelector).Where(uniqueKeys.Add))
+        {
+            yield return key;
+        }
+
+        foreach (var key in rightList.Select(keySelector).Where(uniqueKeys.Add))
+        {
+            yield return key;
+        }
+    }
+
+    /// <summary>
+    /// Formats a key value for display in a path segment. 
+    /// Handles single-value keys and anonymous composite keys. 
+    /// </summary>
+    /// <typeparam name="TKey"></typeparam>
+    /// <param name="key"></param>
+    /// <param name="memberNames"></param>
+    /// <returns></returns>
+    private static string FormatKey<TKey>(TKey key, string[] memberNames)
+        where TKey : notnull
     {
         // If we have member names (simple or anonymous composite key), format as (Name=Value,Name2=Value2)
-        if (memberNames.Count > 0)
+        if (memberNames.Length == 0)
         {
-            if (memberNames.Count == 1)
-            {
-                var value = key?.ToString();
-                value = QuoteIfNeeded(value, key?.GetType());
-                return "(" + memberNames[0] + "=" + value + ")";
-            }
-
-            // Composite (anonymous) key: reflect properties in order
-            var type = key!.GetType();
-            var parts = new List<string>(memberNames.Count);
-            foreach (var name in memberNames)
-            {
-                var prop = type.GetProperty(name);
-                var val = prop?.GetValue(key);
-                var rendered = QuoteIfNeeded(val?.ToString(), prop?.PropertyType);
-                parts.Add(name + "=" + rendered);
-            }
-            return "(" + string.Join(",", parts) + ")";
+            // Fallback: single value with unknown member name
+            return "(" + key.ToString() + ")";
         }
 
-        // Fallback: single value with unknown member name
-        return "(" + key.ToString() + ")";
+        if (memberNames.Length == 1)
+        {
+            var value = key.ToString();
+            value = QuoteIfNeeded(value, key.GetType());
+            return "(" + memberNames[0] + "=" + value + ")";
+        }
+
+        // Composite (anonymous) key: reflect properties in order
+        var type = key.GetType();
+        var parts = new List<string>(memberNames.Length);
+        foreach (var name in memberNames)
+        {
+            var property = type.GetProperty(name);
+            var value = property?.GetValue(key);
+            var quotedValue = QuoteIfNeeded(value, property?.PropertyType);
+            parts.Add(name + "=" + quotedValue);
+        }
+        return "(" + string.Join(",", parts) + ")";
     }
 
-    private static string QuoteIfNeeded(string? value, Type? type)
+    private static string QuoteIfNeeded<T>(T? value, Type? type)
     {
-        if (value is null) return string.Empty;
+        if (value is null)
+        {
+            return string.Empty;
+        }
+
         if (type == typeof(string) || type == typeof(char))
         {
-            return "'" + value + "'";
+            return $"'{value}'";
         }
-        return value;
+
+        return Convert.ToString(value) ?? string.Empty;
     }
 }
