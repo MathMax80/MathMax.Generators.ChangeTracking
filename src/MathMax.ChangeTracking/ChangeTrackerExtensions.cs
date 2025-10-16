@@ -209,7 +209,7 @@ public static class ChangeTrackerExtensions
     {
         if (value is null)
         {
-            return "null";
+            return "";
         }
 
         // Quote string and char types for clarity in output
